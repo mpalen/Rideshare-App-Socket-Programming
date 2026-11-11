@@ -1,7 +1,11 @@
+from socket import *
+serverName = 'localhost'
+serverPort = 12000
+clientSocket = socket(AF_INET, SOCK_DGRAM)
 #client
 # list of 3 customers 'a' 'b' 'c'
-
 # username and pw for each are the same --should be stored in serv
+print("")
 
 # get input from user for username/password
 # authenticate/authorize

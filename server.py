@@ -1,11 +1,14 @@
-#PROGRAM FLOW AS OF NOW:
+#Server Design:
 #*
-#               
+#   Get a status code from client(s) -- saying what theyre about to send
+#   Point server to case of which variable to update
+#   Update variable, send data back -- either echo or appropiate response 
 # *#
 
 import time as t
+import threading
 from socket import *
-
+BUFFER_SIZE = 2048
 #user details, maybe implement as class?
 users = ["A", "B", "C"]    
 #driver details
@@ -29,16 +32,47 @@ def getTime():
 #       3-picked up, otw to dropoff
 #       4-dropped off customer
 
-##START SERVER
-serverPort = 12000
-serverSocket = socket(AF_INET, SOCK_DGRAM)
-serverSocket.bind(('', serverPort))
-print('Server listening...')
+## HANDLE CLIENT RESPONSES
+def handle_client(data, client_address, server_socket):
+    """worker functio to handle incoming data"""
+    try:
+        thread_name = threading.current_thread().name
+        message = data.decode()
+        print(f'[{thread_name}] Received: [{message}] From: [{client_address}]')
 
-def getClientResponse[T](response:T) -> T:
-    clientResponse, clientAddress = serverSocket.recvfrom(2048)
-    response = clientResponse.decode()
-    return response
+        response = f'{message}'
+        server_socket.sendto(response.encode(), client_address)
+        print(f'[{thread_name}] Sent: [{response}] To [{client_address}]')
+    except Exception as e:
+        print(f"Error handling data from {client_address}: {e}")
+
+##START SERVER
+def start_server():
+    serverPort = 12000
+    serverSocket = socket(AF_INET, SOCK_DGRAM)
+    serverSocket.bind(('', serverPort))
+
+    print(f'[SERVER STARTED] Listening on localhost:{serverPort}')
+
+    try:
+        while True: #will change conditional -- maybe while driver/client == None
+            #block execution until data arrives
+            data, clientAddress = serverSocket.recvfrom(BUFFER_SIZE)
+
+            #start worker thread to handle data
+            client_thread = threading.Thread(
+                target=handle_client,
+                daemon=True, #daemon to exit when prog stops
+                args=(data, clientAddress, serverSocket)
+            )
+            client_thread.start()
+    except KeyboardInterrupt:
+        print('\n[SERVER] Closing socket...')
+    finally:
+        serverSocket.close()
+
+
+
 
 
 #get customer
