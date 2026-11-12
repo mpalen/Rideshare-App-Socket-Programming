@@ -1,3 +1,4 @@
+import json
 from socket import *
 serverName = 'localhost'
 serverPort = 12000
@@ -5,9 +6,26 @@ clientSocket = socket(AF_INET, SOCK_DGRAM)
 #client
 # list of 3 customers 'a' 'b' 'c'
 # username and pw for each are the same --should be stored in serv
-print("")
+
 
 # get input from user for username/password
+user = input("Enter user(A/B/C): ")
+action = input("Enter action (request): ")
+pickup_zone = input("Enter pickup zone: ")
+dropoff_zone = input("Enter drop off zone: ")
+
+request = {
+    "user": user,
+    "action": action,
+    "pickup_zone": pickup_zone,
+    "dropoff_zone": dropoff_zone
+}
+
+message = json.dumps(request).encode()
+clientSocket.sendto(message, (serverName, serverPort))
+data = clientSocket.recvfrom(2048)[0]
+reply = json.loads(data.decode())
+print(f"{reply}")
 # authenticate/authorize
 
 # prompt for profile pic
