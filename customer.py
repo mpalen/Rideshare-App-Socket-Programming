@@ -23,9 +23,9 @@ request = {
 
 message = json.dumps(request).encode()
 clientSocket.sendto(message, (serverName, serverPort))
-data = clientSocket.recvfrom(2048)[0]
-reply = json.loads(data.decode())
-print(f"{reply}")
+data = clientSocket.recvfrom(2048)[0].decode()
+
+print(f"{data}")
 # authenticate/authorize
 
 # prompt for profile pic

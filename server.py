@@ -27,17 +27,37 @@ class Ride:
     dropoff_time:t
     status:int
 
+##still missing a way to store users??
+
+def handle_request(user, pickup_zone, dropoff_zone) -> str:
+    myStr = f"[HANDLER_REQ] Received: {user=}, {pickup_zone=}, {dropoff_zone=}"
+    return myStr
 
 ## HANDLE CLIENT RESPONSES
 def handle_client(data, client_address, server_socket):
+    handlers = {
+        "request": handle_request
+    }
     """worker function to handle incoming data"""
     try:
         thread_name = threading.current_thread().name
         message = data.decode()
         print(f'[{thread_name}] Received: [{message}] From: [{client_address}]')
-        ## Read action, call next function
         
-        response = f'{message}'
+        ## Read action, call next function
+        jsonData = json.loads(message)
+        clientAction = jsonData["action"]
+        ##clean json before passing it:
+        payload = {key: value for key, value in jsonData.items() if key != "action"}
+        handler = handlers.get(
+            clientAction, 
+            lambda **kwargs: "Invalid"
+            )(**payload) #lambda is also rlly cool, gets rid of the need for a conditional check
+        ## so the **jsonData is rlly cool here, it unpacks the keys from the dict in the parsed JSON and correlates them by NAME!! to the function args
+
+
+        ## reply back
+        response = handler
         server_socket.sendto(response.encode(), client_address)
         print(f'[{thread_name}] Sent: [{response}] To [{client_address}]')
     except Exception as e:
