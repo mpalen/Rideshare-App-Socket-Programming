@@ -14,51 +14,90 @@ from queue import Queue
 
 BUFFER_SIZE = 2048
 
+primaryRideID = 0
+def genRideID() -> int:
+    global primaryRideID
+    primaryRideID += 1
+    return primaryRideID
+user_list = ['A', 'B', 'C']
+
 shutdown_event = threading.Event() ##init shutdown event flag
 STOP = object() ## create stop obj for sessions to recognize
-
-@dataclass
-class ClientSession:
-    address: tuple[str, int] # client's address + port
-    messages: Queue = field(default_factory=Queue) # Accepts a zero-argument callable (like list or dict) to generate a fresh default value for each new instance.
-    worker: threading.Thread | None = None
-    user: str | None = None
-    authenticaed: bool = False
-
 
 @dataclass 
 class Ride:
     """dataclass for Ride"""
     rideID:int
     customer:str
-    driver:str
-    pick_zone:str
-    dropoff_zone:str
-    distance:int
-    cost:float
+    pickup_zone:int
+    dropoff_zone:int
     req_time:datetime.time
-    dropoff_time:datetime.time
-    status:int
+    distance:float
+    cost:float
+    status:int # 1: requested, 2: accepted, 3: picked_up, 4: dropped_off
+    dropoff_time:datetime.time | None=None
+    driver:str | None=None
+
+
+@dataclass
+class ClientSession:
+    address: tuple[str, int] # client's address + port
+    messages: Queue = field(default_factory=Queue) # Accepts a zero-argument callable (like list or dict) to generate a fresh default value for each new instance.
+    worker: threading.Thread | None = None
+    user: str = field(default_factory=str)
+    authenticated: bool = False
+    status: int = 0 #0: not riding, 1: riding
+    ridesRequested: list[Ride] = field(default_factory=list)
+
+
+
 
 #SESSION STORE: (so we dont keep making threads)
 sessionsList: dict[tuple[str, int], ClientSession] = {}
 
-def handle_login(user):
-    return f"[HANDLER_LOGIN] {user} successfully logged in!"
+def handle_login(session, user):
+    if user in user_list:
+        session.user = user
+        session.authenticated = True
+        return f"[HANDLER_LOGIN] {user} successfully logged in!"
+    else:
+        return f"[HANDLER_LOGIN] [ERROR] {user} not in client list!"
 
-def handle_request(user, pickup_zone, dropoff_zone) -> str:
-    myStr = f"[HANDLER_REQ] Received: {user=}, {pickup_zone=}, {dropoff_zone=}"
-    return myStr
+def handle_request(session: ClientSession, pickup_zone, dropoff_zone, distance, cost):
+    if session.authenticated == False:
+        return f"[HANDLER_REQ][ERROR] {session.user} not authenticated!"
+    ride = Ride(
+        rideID=genRideID(),
+        customer=session.user,
+        pickup_zone=pickup_zone,
+        dropoff_zone=dropoff_zone,
+        req_time=datetime.datetime.now().time(),
+        distance=distance,
+        cost=cost,
+        status=1
+    )
+
+    session.ridesRequested.append(ride)
+    print(
+    f"[HANDLER_REQ] {session.user=} requested ride "
+    f"from {pickup_zone} to {dropoff_zone}.\n"
+    f"Distance: {distance}   Cost: {cost}"
+    )
+
+    return (
+        f"[HANDLER_REQ] Ride successfully requested "
+        f"from {pickup_zone} to {dropoff_zone}."
+    )
+    
 
 
 ## HANDLE CLIENT RESPONSES
-def handle_client(data, client_address, server_socket, session):
+def handle_client(session: ClientSession, data, client_address, server_socket):
     ##TODO: update session login/user/auth status
     handlers = {
         "request": handle_request,
         "login": handle_login
     }
-    """worker function to handle incoming data"""
     try:
         thread_name = threading.current_thread().name
         message = data
@@ -73,7 +112,7 @@ def handle_client(data, client_address, server_socket, session):
         handler = handlers.get(
             clientAction, 
             lambda **kwargs: "Invalid"
-            )(**payload) #lambda is also rlly cool, gets rid of the need for a conditional check
+            )(session, **payload) #lambda is also rlly cool, gets rid of the need for a conditional check
         ## so the **jsonData is rlly cool here, it unpacks the keys from the dict in the parsed JSON and correlates them by NAME!! to the function args
 
 
@@ -93,7 +132,7 @@ def client_worker(session, server_socket):
         try:
             if data is STOP:
                 return
-            handle_client(data, session.address, server_socket, session)
+            else: handle_client(session, data, session.address, server_socket)
         finally:
             session.messages.task_done()
 
